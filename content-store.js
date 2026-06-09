@@ -38,6 +38,7 @@
         journal,
         description,
         categories,
+        thumbSrc: "",
         alt: title ? `${title} 科研绘图案例` : fallback.alt,
       };
     }

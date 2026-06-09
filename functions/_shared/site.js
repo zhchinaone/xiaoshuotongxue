@@ -95,7 +95,7 @@ export function normalizeIncomingContent(content, fallbackContent = DEFAULT_CONT
           description,
           categories,
           alt: title ? `${title} 科研绘图案例` : "",
-          thumbSrc: `assets/cases/thumbs/case-${number}-thumb.jpg`,
+          thumbSrc: "",
           largeSrc: `assets/cases/large/case-${number}-large.jpg`,
           thumbAttachment: null,
           largeAttachment: null,

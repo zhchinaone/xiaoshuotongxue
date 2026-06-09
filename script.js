@@ -102,7 +102,12 @@ function renderGallery() {
       return `
         <article class="case-card" data-category="${categories}">
           <button class="case-preview" type="button" data-large="${largeSource}" data-title="${title}">
-            <img src="${thumbSource}" alt="${entry.alt || `${title} 科研绘图案例`}" decoding="async" />
+            <img
+              src="${thumbSource}"
+              alt="${entry.alt || `${title} 科研绘图案例`}"
+              decoding="async"
+              data-large-src="${largeSource}"
+            />
           </button>
           <div class="case-meta">
             <span>${school}</span>
@@ -125,6 +130,13 @@ function renderGallery() {
 function bindGalleryEvents() {
   document.querySelectorAll(".case-preview img").forEach((image) => {
     image.addEventListener("error", () => {
+      const largeSource = image.dataset.largeSrc || "";
+      if (largeSource && image.src !== largeSource && !image.dataset.triedLargeFallback) {
+        image.dataset.triedLargeFallback = "true";
+        image.src = largeSource;
+        return;
+      }
+
       image.src = placeholderImage;
     });
   });
