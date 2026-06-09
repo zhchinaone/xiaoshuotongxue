@@ -86,6 +86,19 @@ a:focus-visible {
   font-weight: 800;
 }
 
+.brand-mark-image {
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.08);
+}
+
+.brand-mark-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .brand strong,
 .brand small {
   display: block;
@@ -538,27 +551,84 @@ h3 {
 
 .contact-section {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
-  gap: clamp(30px, 6vw, 80px);
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 460px);
+  gap: clamp(28px, 4.5vw, 58px);
+  align-items: stretch;
   width: min(1200px, calc(100% - 36px));
   margin: 0 auto clamp(76px, 9vw, 124px);
   padding: clamp(48px, 7vw, 82px);
-  border-radius: 8px;
+  border-radius: 24px;
   background: #111113;
   color: #fff;
 }
 
+.contact-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  min-height: 100%;
+  padding: 8px 0;
+}
+
+.contact-copy h2 {
+  max-width: 7ch;
+  margin: 0;
+  font-size: clamp(42px, 4.4vw, 60px);
+  line-height: 1.08;
+}
+
 .contact-copy p {
-  max-width: 700px;
+  margin: 0;
+  max-width: 620px;
   color: rgba(255, 255, 255, 0.72);
+  font-size: 18px;
+  line-height: 1.75;
+}
+
+.contact-points {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 100%;
+}
+
+.contact-point {
+  min-height: 122px;
+  padding: 18px 18px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.contact-point strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.contact-point span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 6px;
 }
 
 .contact-panel {
-  align-self: center;
-  padding: 28px;
+  align-self: stretch;
+  padding: 24px;
   background: #fff;
   color: var(--ink);
   font-style: normal;
+  border-radius: 18px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.18);
 }
 
 .contact-panel span {
@@ -571,14 +641,60 @@ h3 {
 
 .contact-panel strong {
   display: block;
-  margin-top: 12px;
-  font-size: clamp(34px, 5vw, 54px);
-  line-height: 1;
+  margin-top: 10px;
+  font-size: clamp(28px, 3.2vw, 46px);
+  line-height: 1.08;
 }
 
 .contact-panel p {
-  margin: 20px 0 18px;
+  margin: 14px 0 0;
   overflow-wrap: anywhere;
+  font-size: 16px;
+  line-height: 1.68;
+}
+
+.contact-panel-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.contact-panel-head p {
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.contact-card {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.contact-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.contact-card h3 {
+  margin: 12px 0 6px;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.contact-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .site-footer {
@@ -685,6 +801,14 @@ h3 {
   .process-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .contact-copy {
+    padding: 0;
+  }
+
+  .contact-copy h2 {
+    max-width: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -701,6 +825,15 @@ h3 {
   .brand small,
   .nav-cta {
     display: none;
+  }
+
+  .contact-points,
+  .contact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-grid {
+    gap: 14px;
   }
 
   .hero {
@@ -786,6 +919,7 @@ h3 {
   .contact-section {
     width: min(100% - 28px, 1200px);
     padding: 34px 20px;
+    border-radius: 18px;
   }
 
   .contact-actions {

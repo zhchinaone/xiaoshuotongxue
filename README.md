@@ -95,6 +95,10 @@ FEISHU_WORKS_TABLE_NAME
 - `首页主视觉`
 - `作品库`
 
+如果你希望 Cloudflare Pages 项目名、默认子域和本地项目名称统一，建议统一使用：
+
+- `xiaoshuotongxue`
+
 ## 飞书多维表格会存什么
 
 程序第一次保存时，会自动在你指定的多维表格里寻找或创建两张表：
