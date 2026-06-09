@@ -1,0 +1,9 @@
+{
+  "name": "xiaoshuo-scientific-illustration-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scientific illustration website with Feishu Bitable admin backend.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

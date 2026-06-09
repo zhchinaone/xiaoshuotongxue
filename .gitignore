@@ -1,0 +1,9 @@
+.env
+node_modules
+.env.local
+backups/
+imports/
+server-out.log
+server-err.log
+preview-*.png
+.edge-preview*/

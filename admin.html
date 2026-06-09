@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>小硕科研绘图 | 内容管理</title>
+    <meta name="description" content="可视化上传和编辑小硕科研绘图官网内容。" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="admin-body">
+    <header class="admin-topbar">
+      <a class="brand" href="index.html" aria-label="返回官网">
+        <span class="brand-mark">XS</span>
+        <span class="brand-text">
+          <strong>小硕科研绘图后台</strong>
+          <small>Visual Content Manager</small>
+        </span>
+      </a>
+      <div class="admin-actions">
+        <a class="button button-ghost" href="index.html">查看官网</a>
+        <button class="button button-ghost" type="button" id="export-config">导出配置</button>
+        <label class="button button-ghost admin-import-button" for="import-config">导入配置</label>
+        <input id="import-config" type="file" accept=".json,application/json" hidden />
+        <button class="button button-ghost" type="button" id="reset-config">恢复默认</button>
+        <button class="button button-primary" type="button" id="save-config">保存修改</button>
+      </div>
+    </header>
+
+    <main class="admin-shell">
+      <section class="admin-intro">
+        <p class="eyebrow">Content Studio</p>
+        <h1>直接上传图片和填写信息，官网会自动更新。</h1>
+        <p>
+          这里不需要手写 `cases`。你可以上传首页图、缩略图、大图，填写学校、期刊、说明和分类，然后点击保存。配置好飞书参数后，内容会直接同步到飞书多维表格，官网再从飞书读取展示。
+        </p>
+        <p class="admin-status" id="admin-status">当前内容尚未改动。</p>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-heading">
+          <div>
+            <p class="eyebrow">Hero Images</p>
+            <h2>首页主视觉</h2>
+          </div>
+          <p>上传后会自动压缩，适合首页三张展示图。</p>
+        </div>
+        <div class="admin-hero-grid" id="hero-manager"></div>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-heading">
+          <div>
+            <p class="eyebrow">Case Library</p>
+            <h2>作品库管理</h2>
+          </div>
+          <div class="admin-case-tools">
+            <button class="button button-ghost" type="button" id="duplicate-case">复制当前作品</button>
+            <button class="button button-ghost" type="button" id="delete-case">删除当前作品</button>
+            <button class="button button-primary" type="button" id="add-case">新增作品</button>
+          </div>
+        </div>
+
+        <div class="admin-case-layout">
+          <aside class="admin-case-list" id="case-list" aria-label="作品列表"></aside>
+
+          <section class="admin-case-editor">
+            <div class="admin-editor-card">
+              <div class="admin-preview-grid">
+                <figure class="admin-preview-panel">
+                  <figcaption>缩略图</figcaption>
+                  <img id="thumb-preview" src="" alt="" />
+                </figure>
+                <figure class="admin-preview-panel">
+                  <figcaption>大图</figcaption>
+                  <img id="large-preview" src="" alt="" />
+                </figure>
+              </div>
+
+              <div class="admin-form-grid">
+                <label class="admin-field">
+                  <span>学校 / 机构</span>
+                  <input id="case-school" type="text" placeholder="例如：清华大学" />
+                </label>
+                <label class="admin-field">
+                  <span>期刊 / 年份</span>
+                  <input id="case-journal" type="text" placeholder="例如：Advanced Materials · 2026" />
+                </label>
+                <label class="admin-field admin-field-full">
+                  <span>作品说明</span>
+                  <input id="case-description" type="text" placeholder="例如：智能材料 / 期刊封面" />
+                </label>
+                <label class="admin-field admin-field-full">
+                  <span>图片替代文字</span>
+                  <input id="case-alt" type="text" placeholder="例如：首页科研绘图案例大图" />
+                </label>
+                <label class="admin-field admin-field-full">
+                  <span>原图上传</span>
+                  <input id="case-source" type="file" accept="image/*" />
+                  <small class="admin-field-hint">上传一张原图，系统会自动生成缩略图和大图。常规情况下只用这一项就够了。</small>
+                </label>
+                <label class="admin-field">
+                  <span>缩略图上传</span>
+                  <input id="case-thumb" type="file" accept="image/*" />
+                </label>
+                <label class="admin-field">
+                  <span>大图上传</span>
+                  <input id="case-large" type="file" accept="image/*" />
+                </label>
+              </div>
+
+              <div class="admin-field admin-field-full">
+                <span>分类</span>
+                <div class="admin-tag-grid" id="category-grid"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="site-config.js"></script>
+    <script src="content-store.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>
