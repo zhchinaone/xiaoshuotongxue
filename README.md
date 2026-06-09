@@ -1,8 +1,11 @@
 # 小硕科研绘图网站维护说明
 
-现在这个项目已经升级成“官网 + 可视化后台 + 飞书多维表格后端”结构。
+现在这个项目同时支持两种运行方式：
 
-## 你平时怎么用
+- 本地 Node 版：适合你在电脑上直接维护和调试
+- Cloudflare Pages 版：适合正式部署到公网
+
+## 本地怎么用
 
 1. 启动本地服务：
 
@@ -22,7 +25,7 @@ http://localhost:3000
 http://localhost:3000/admin.html
 ```
 
-在后台里你可以直接：
+后台里可以直接：
 
 - 上传首页三张图
 - 上传作品缩略图和大图
@@ -31,9 +34,9 @@ http://localhost:3000/admin.html
 - 新增、复制、删除作品
 - 导出和导入配置
 
-## 飞书接入前要做什么
+## 本地 `.env` 怎么配
 
-先复制一份 `.env.example`，改名为 `.env`，然后填这几个参数：
+先复制一份 `.env.example`，改名为 `.env`，然后填写：
 
 ```text
 PORT=3000
@@ -44,12 +47,53 @@ FEISHU_HERO_TABLE_NAME=首页主视觉
 FEISHU_WORKS_TABLE_NAME=作品库
 ```
 
-其中：
+含义如下：
 
-- `FEISHU_APP_ID` / `FEISHU_APP_SECRET`：飞书开放平台自建应用的凭证
+- `FEISHU_APP_ID` / `FEISHU_APP_SECRET`：飞书开放平台自建应用凭证
 - `FEISHU_BITABLE_APP_TOKEN`：多维表格链接里 `/base/` 后面的那段
 - `FEISHU_HERO_TABLE_NAME`：首页图对应的数据表名
 - `FEISHU_WORKS_TABLE_NAME`：作品库对应的数据表名
+
+## Cloudflare Pages 怎么部署
+
+这个仓库现在已经补好了 Cloudflare Pages 所需结构：
+
+- `functions/api/content.js`
+- `functions/api/status.js`
+- `functions/api/asset.js`
+- `scripts/build-pages.js`
+- `wrangler.toml`
+
+部署时建议这样配：
+
+1. 把仓库推到 GitHub。
+2. 在 Cloudflare Pages 新建项目并连接这个仓库。
+3. Build command 填：
+
+```bash
+npm run build:pages
+```
+
+4. Build output directory 填：
+
+```text
+dist
+```
+
+5. 在 Pages 项目的 Environment Variables 中配置：
+
+```text
+FEISHU_APP_ID
+FEISHU_APP_SECRET
+FEISHU_BITABLE_APP_TOKEN
+FEISHU_HERO_TABLE_NAME
+FEISHU_WORKS_TABLE_NAME
+```
+
+如果后两个表名不改，也可以不填，系统会默认使用：
+
+- `首页主视觉`
+- `作品库`
 
 ## 飞书多维表格会存什么
 
@@ -58,31 +102,45 @@ FEISHU_WORKS_TABLE_NAME=作品库
 - `首页主视觉`
 - `作品库`
 
-大致字段如下：
+字段大致如下：
 
 - `首页主视觉`
-  `排序`、`图片说明`、`图片附件`
+  `排序`、`图片说明`、`本地图片路径`、`图片附件`
 
 - `作品库`
-  `排序`、`学校机构`、`期刊年份`、`作品说明`、`分类`、`图片替代文字`、`缩略图`、`大图`、`是否发布`
+  `排序`、`缓存键`、`学校机构`、`期刊年份`、`作品说明`、`分类`、`图片替代文字`、`缩略图本地缓存`、`缩略图`、`大图`、`是否发布`
 
-## 现在的保存逻辑
+## 现在的图片逻辑
 
-- 官网优先从后端 API 读取内容
+- 官网优先从 `/api/content` 读取内容
 - 后端优先从飞书多维表格读取内容
 - 后台点击“保存修改”后，会把内容同步到飞书
-- 首页展示图和作品缩略图会自动落到本地 `assets` 缓存，官网优先走本地文件
-- 作品大图继续走飞书附件，方便你在飞书里统一管理和同步
-- 如果 `.env` 还没配置，官网会先展示默认内容，后台会提示你当前还没连上飞书
+- 缩略图如果飞书里已经记录了本地缓存路径，会优先加载仓库里的静态文件
+- 大图继续走飞书附件代理，方便你在飞书统一管理
+
+要注意的一点：
+
+- 本地 Node 版仍然可以继续做“运行时落本地缓存”
+- Cloudflare Pages 版不能在运行时写入仓库里的 `assets/`
+- 所以 Pages 上新上传的图片会保存到飞书并正常展示，但不会自动在服务器端新生成本地缩略图文件
+
+如果你后面想把“新上传缩略图也自动转成本地静态缓存”继续保留，适合再升级成：
+
+- Cloudflare R2 方案
+- 或者增加一个构建期同步脚本
 
 ## 重要提醒
 
-当前版本需要通过 `http://localhost:3000` 访问，不要再直接双击打开 `index.html` 或 `admin.html`，因为飞书版后台依赖后端 API。
+- 不要直接双击打开 `index.html` 或 `admin.html`
+- 本地请通过 `http://localhost:3000`
+- Cloudflare 上请通过 Pages 域名访问
 
-## 文件说明
+## 主要文件说明
 
-- `server.js`：本地后端，负责静态文件服务和飞书 API 同步
+- `server.js`：本地 Node 后端
+- `functions/api/*`：Cloudflare Pages Functions 接口
 - `admin.html` / `admin.js`：可视化内容管理页
 - `index.html` / `script.js`：官网展示页
 - `content-store.js`：图片压缩、内容结构工具
-- `site-config.js`：默认展示内容，飞书未配置时会作为回退内容
+- `site-config.js`：默认展示内容
+- `scripts/build-pages.js`：把静态文件复制到 `dist/`
