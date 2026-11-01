@@ -444,6 +444,10 @@ class FeishuBitableService {
     const assetManifest = await this.getAssetManifest();
 
     const heroImages = heroRecords
+      .filter((record) =>
+        record.fields[schema.heroFields.image]?.length ||
+        String(record.fields[schema.heroFields.localPath] || "").trim(),
+      )
       .sort((a, b) => (a.fields[schema.heroFields.sort] || 0) - (b.fields[schema.heroFields.sort] || 0))
       .slice(0, 3)
       .map((record, index) => {
