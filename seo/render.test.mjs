@@ -57,6 +57,15 @@ test('homepage preserves the Google ownership verification exactly once inside h
   }
 });
 
+test('homepage preserves the Bing ownership verification exactly once inside head', () => {
+  for (const preview of [false, true]) {
+    const { body } = render('/', [entry()], { preview });
+    const head = body.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)[1];
+    assert.match(head, /<meta name="msvalidate\.01" content="F3E860BC06D66F80C912644BD7AD7DD3" \/>/);
+    assert.equal((body.match(/name="msvalidate\.01"/g) || []).length, 1);
+  }
+});
+
 test('pagination is server-rendered, 24 per page, canonical excludes tracking', () => {
   const cases = Array.from({ length: 49 }, (_, i) => entry(i));
   const first = render('/cases/', cases).body;
