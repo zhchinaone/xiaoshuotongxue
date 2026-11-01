@@ -80,6 +80,7 @@ async function sendWebResponse(response, result) {
 const server = http.createServer(async (request, response) => {
   try {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+    if (/^\/(admin|ocr-tool)\/?$/.test(requestUrl.pathname)) requestUrl.pathname = requestUrl.pathname.replace(/\/$/, '') + '.html';
     const [renderer, contentModule, contentApi, mediaApi] = await seoModules;
     if (requestUrl.pathname === '/api/content' || requestUrl.pathname === '/api/media') {
       const chunks = [];

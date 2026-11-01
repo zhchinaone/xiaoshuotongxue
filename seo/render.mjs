@@ -164,6 +164,6 @@ export function renderRoute({ url, content = {}, homeHtml, preview = false }) {
     const entry = data.cases.find(item => item.caseKey === key && reviewed(item));
     return entry ? detail(entry, data, preview) : missing();
   }
-  if (/^\/(?:api|assets|static)(?:\/|$)/.test(path) || ['/admin.html', '/ocr-tool.html'].includes(path) || /\.(?:css|m?js|json|map|png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|otf|pdf|mp4|webm|txt|xml)$/i.test(path)) return null;
+  if (/^\/(?:api|assets|static)(?:\/|$)/.test(path) || /^\/(?:admin|ocr-tool)(?:\.html)?\/?$/.test(path) || /\.(?:css|m?js|json|map|png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|otf|pdf|mp4|webm|txt|xml)$/i.test(path)) return null;
   return missing();
 }

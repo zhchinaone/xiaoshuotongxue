@@ -6,7 +6,7 @@ export async function onRequest(context) {
   if (url.pathname.startsWith('/api/')) return context.next();
   if (/\.(css|js|jpg|jpeg|png|webp|svg|json|ico|woff2?)$/.test(url.pathname)) return context.next();
   const preview = context.env.CF_PAGES_BRANCH && context.env.CF_PAGES_BRANCH !== 'main';
-  if (/\/(admin|ocr-tool)\.html$/.test(url.pathname)) {
+  if (/^\/(admin|ocr-tool)(?:\.html)?\/?$/.test(url.pathname)) {
     const response = await context.next();
     const headers = new Headers(response.headers);
     headers.set('X-Robots-Tag', 'noindex, nofollow');
