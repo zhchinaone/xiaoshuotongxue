@@ -22,30 +22,31 @@ function publicContent(content = {}) {
     heroImages: (Array.isArray(content.heroImages) ? content.heroImages : []).map(item => ({ src: asset(item?.src), alt: text(item?.alt) })),
     cases: (Array.isArray(content.cases) ? content.cases : []).filter(item => item && item.published !== false).map(item => {
       const entry = {};
-      for (const key of ['caseKey', 'title', 'school', 'journal', 'description', 'alt', 'background', 'challenge', 'approach', 'researchArea']) entry[key] = text(item[key]);
-      entry.deliverables = Array.isArray(item.deliverables) ? item.deliverables.filter(v => typeof v === 'string') : text(item.deliverables);
+      for (const key of ['caseKey', 'school', 'journal']) entry[key] = text(item[key]);
+      entry.year = text(item.year) || (Number.isInteger(item.year) ? String(item.year) : '');
       entry.categories = Array.isArray(item.categories) ? item.categories.filter(v => typeof v === 'string').join(' ') : text(item.categories);
       entry.thumbSrc = asset(item.thumbSrc);
       entry.largeSrc = asset(item.largeSrc);
       entry.detailReviewed = Boolean(item.detailReviewed);
+      entry.alt = label(entry);
       return entry;
     }),
   };
 }
 
 function reviewed(entry) {
-  return Boolean(entry.detailReviewed && entry.caseKey && entry.title && entry.background && entry.challenge && entry.approach && (entry.largeSrc || entry.thumbSrc));
+  return Boolean(entry.detailReviewed && entry.caseKey && entry.school && entry.journal && (entry.largeSrc || entry.thumbSrc));
 }
 const detailPath = entry => `/cases/${encodeURIComponent(entry.caseKey)}/`;
 const absolute = path => new URL(path, ORIGIN).href;
 const categories = entry => entry.categories.split(/\s+/).filter(Boolean);
-const label = entry => entry.title || [entry.school, entry.journal].filter(Boolean).join(' · ') || entry.description || '科研绘图作品';
+const label = entry => [entry.school, entry.journal].filter(Boolean).join(' · ') || '科研绘图作品';
 
 function card(entry) {
   const title = label(entry);
   const image = entry.thumbSrc || entry.largeSrc;
   const large = entry.largeSrc || image;
-  return `<article class="case-card" data-category="${esc(entry.categories)}">${image ? `<a class="case-preview" href="${esc(large)}" data-large="${esc(large)}" data-title="${esc(title)}"><img src="${esc(image)}" alt="${esc(entry.alt || title)}" loading="lazy" decoding="async" data-large-src="${esc(large)}" /></a>` : ''}<div class="case-meta">${entry.school ? `<span>${esc(entry.school)}</span>` : ''}${entry.journal ? `<strong>${esc(entry.journal)}</strong>` : ''}${entry.description ? `<em>${esc(entry.description)}</em>` : ''}${reviewed(entry) ? `<a href="${esc(detailPath(entry))}">${esc(entry.title)} · 查看案例</a>` : ''}</div></article>`;
+  return `<article class="case-card" data-category="${esc(entry.categories)}">${image ? `<a class="case-preview" href="${esc(large)}" data-large="${esc(large)}" data-title="${esc(title)}"><img src="${esc(image)}" alt="${esc(title)}" loading="lazy" decoding="async" data-large-src="${esc(large)}" /></a>` : ''}<div class="case-meta">${entry.school ? `<span>${esc(entry.school)}</span>` : ''}${entry.journal ? `<strong>${esc(entry.journal)}</strong>` : ''}${entry.year ? `<span>${esc(entry.year)}</span>` : ''}${reviewed(entry) ? `<a href="${esc(detailPath(entry))}">${esc(title)} · 查看案例</a>` : ''}</div></article>`;
 }
 
 const CSS = `<style id="seo-styles">
@@ -57,7 +58,7 @@ const CSS = `<style id="seo-styles">
 .seo-page .case-card{min-width:0;border-radius:8px;overflow:hidden;border:1px solid #e1e3e5;background:#fff}
 .seo-page .case-preview{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;width:100%;height:auto;background:#f5f5f7}
 .seo-page .case-preview img{width:100%;height:100%;object-fit:contain;position:static}
-.seo-page .case-meta{padding:16px;display:grid;gap:8px}.seo-page .case-meta em{font-style:normal}
+.seo-page .case-meta{padding:16px;display:grid;gap:8px}
 .seo-detail-image{display:block;width:100%;height:auto;max-height:none;object-fit:contain}.seo-copy{max-width:800px;white-space:pre-line;line-height:1.8}
 .seo-page [aria-current=page]{font-weight:bold}.seo-page *{letter-spacing:0}
 @media(max-width:760px){.seo-page .gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -117,20 +118,24 @@ function listing(url, content, preview) {
   const visible = entries.slice((number - 1) * PAGE_SIZE, number * PAGE_SIZE);
   const title = `${filtered ? CATEGORIES[category] || category : '科研绘图案例'}${number > 1 ? ` · 第 ${number} 页` : ''} | ${BRAND}`;
   return page({ title, description: '浏览科研绘图、图形摘要、期刊封面和机制示意作品。', path, noindex: preview || filtered, image: visible[0]?.largeSrc || visible[0]?.thumbSrc,
-    schema: { '@type': 'CollectionPage', name: title, url: absolute(path), mainEntity: { '@type': 'ItemList', itemListElement: visible.filter(reviewed).map((entry, i) => ({ '@type': 'ListItem', position: i + 1, url: absolute(detailPath(entry)), name: entry.title })) } },
+    schema: { '@type': 'CollectionPage', name: title, url: absolute(path), mainEntity: { '@type': 'ItemList', itemListElement: visible.filter(reviewed).map((entry, i) => ({ '@type': 'ListItem', position: i + 1, url: absolute(detailPath(entry)), name: label(entry) })) } },
     body: `${breadcrumbs([['首页', '/'], ['作品案例']])}<h1>${esc(filtered ? CATEGORIES[category] || category : '科研绘图案例')}</h1><nav class="seo-filters" aria-label="案例分类"><a href="/cases/">全部</a>${Object.entries(CATEGORIES).map(([key, name]) => `<a href="/cases/?category=${key}"${key === category ? ' aria-current="page"' : ''}>${name}</a>`).join('')}</nav><div class="gallery-grid">${visible.map(card).join('')}</div>${!visible.length ? '<p>暂无作品。</p>' : ''}<nav class="seo-pagination" aria-label="分页">${number > 1 ? `<a rel="prev" href="${esc(href(number - 1))}">上一页</a>` : ''}<span aria-current="page">第 ${number} / ${count} 页</span>${number < count ? `<a rel="next" href="${esc(href(number + 1))}">下一页</a>` : ''}</nav>` });
 }
 
 function detail(entry, content, preview) {
+  const title = label(entry);
   const path = detailPath(entry);
   const image = entry.largeSrc || entry.thumbSrc;
   const related = content.cases.filter(other => other.caseKey !== entry.caseKey && reviewed(other) && categories(other).some(category => categories(entry).includes(category))).slice(0, 3);
-  const crumbs = [['首页', '/'], ['作品案例', '/cases/'], [entry.title, path]];
-  const facts = [['学校 / 机构', entry.school], ['期刊', entry.journal], ['研究方向', entry.researchArea]].filter(([, value]) => value);
-  const deliverables = Array.isArray(entry.deliverables) ? entry.deliverables.filter(Boolean) : entry.deliverables ? [entry.deliverables] : [];
-  return page({ title: `${entry.title} | ${BRAND}`, description: entry.description || entry.background, path, image, noindex: preview,
-    schema: { '@graph': [{ '@type': 'CreativeWork', name: entry.title, description: entry.description || entry.background, url: absolute(path), image: absolute(image) }, { '@type': 'BreadcrumbList', itemListElement: crumbs.map(([name, url], i) => ({ '@type': 'ListItem', position: i + 1, name, item: absolute(url) })) }] },
-    body: `${breadcrumbs([['首页', '/'], ['作品案例', '/cases/'], [entry.title]])}<article><h1>${esc(entry.title)}</h1>${facts.length ? `<dl class="seo-copy">${facts.map(([name, value]) => `<dt>${name}</dt><dd>${esc(value)}</dd>`).join('')}</dl>` : ''}<a href="${esc(image)}" aria-label="打开完整作品图片"><img class="seo-detail-image" src="${esc(image)}" alt="${esc(entry.alt || entry.title)}" /></a>${[['研究背景', entry.background], ['绘图挑战', entry.challenge], ['设计思路', entry.approach]].map(([heading, value]) => `<section class="seo-copy"><h2>${heading}</h2><p>${esc(value)}</p></section>`).join('')}${deliverables.length ? `<section class="seo-copy"><h2>交付内容</h2><ul>${deliverables.map(value => `<li>${esc(value)}</li>`).join('')}</ul></section>` : ''}</article>${related.length ? `<section><h2>相关案例</h2><div class="gallery-grid">${related.map(card).join('')}</div></section>` : ''}<p><a href="/#contact">联系咨询</a></p>` });
+  const crumbs = [['首页', '/'], ['作品案例', '/cases/'], [title, path]];
+  const combinedYear = entry.journal.match(/\b(?:19|20)\d{2}\b/)?.[0] || '';
+  const year = entry.year || combinedYear;
+  const journal = combinedYear ? entry.journal.replace(combinedYear, '').replace(/^[\s·|/—-]+|[\s·|/—-]+$/g, '') : entry.journal;
+  const facts = [['学校 / 机构', entry.school], ['年份', year], ['期刊', journal]].filter(([, value]) => value);
+  const summary = [entry.school, year, journal].filter(Boolean).join(' · ');
+  return page({ title: `${title} | ${BRAND}`, description: summary, path, image, noindex: preview,
+    schema: { '@graph': [{ '@type': 'CreativeWork', name: title, description: summary, url: absolute(path), image: absolute(image) }, { '@type': 'BreadcrumbList', itemListElement: crumbs.map(([name, url], i) => ({ '@type': 'ListItem', position: i + 1, name, item: absolute(url) })) }] },
+    body: `${breadcrumbs([['首页', '/'], ['作品案例', '/cases/'], [title]])}<article><h1>${esc(title)}</h1><dl class="seo-copy">${facts.map(([name, value]) => `<dt>${name}</dt><dd>${esc(value)}</dd>`).join('')}</dl><a href="${esc(image)}" aria-label="打开完整作品图片"><img class="seo-detail-image" src="${esc(image)}" alt="${esc(title)}" /></a></article>${related.length ? `<section><h2>相关案例</h2><div class="gallery-grid">${related.map(card).join('')}</div></section>` : ''}<p><a href="/#contact">联系咨询</a></p>` });
 }
 
 function missing() {

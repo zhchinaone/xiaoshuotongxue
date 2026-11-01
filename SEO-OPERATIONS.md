@@ -8,7 +8,7 @@
 
 ## Content workflow
 
-Manage cases in Feishu or `/admin.html`. Existing works remain visible without a detail page. To publish a detail page, provide the case title, background, challenge, approach and an image, then check the detail-review field after confirming facts and publication rights. Optional research area and deliverables are displayed only when provided. Never change a published case key.
+Manage cases in Feishu or `/admin.html`. Public cases show artwork, school and journal/year only. To publish a detail page, provide the school, journal/year and an image, then check the review field after confirming facts and publication rights. Titles and search summaries are generated from these facts; long descriptions are not required or published. Existing descriptive fields are preserved for compatibility but hidden in the editor. Never change a published case key.
 
 New Feishu fields: 案例键, 案例标题, 研究领域, 研究背景, 表达难点, 绘图思路, 交付内容, 详情已审核, 缩略图原图标识. Exact schema names are defined in `functions/_shared/site.js`.
 

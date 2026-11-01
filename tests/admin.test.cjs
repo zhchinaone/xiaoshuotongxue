@@ -241,4 +241,24 @@ test("admin is noindex, case key is readonly and review starts unchecked", () =>
   assert.match(html, /name="robots" content="noindex, nofollow"/);
   assert.match(html, /id="case-key"[^>]*readonly/);
   assert.doesNotMatch(html, /id="case-detail-reviewed"[^>]*checked/);
+  assert.match(html, /已确认学校、期刊年份及公开授权/);
+});
+
+test("obsolete fields remain in hidden labels while school, journal/year and artworks stay visible", () => {
+  const html = source("admin.html");
+  const labels = Array.from(html.matchAll(/<label\b([^>]*)>([\s\S]*?)<\/label>/g));
+  for (const id of [
+    "case-key", "case-title", "case-research-area", "case-background", "case-challenge",
+    "case-approach", "case-deliverables", "case-description", "case-alt",
+  ]) {
+    const label = labels.find((match) => match[2].includes(`id="${id}"`));
+    assert.ok(label, `${id} must remain in the DOM`);
+    assert.match(label[1], /\bhidden\b/, `${id} parent label must be hidden`);
+  }
+  for (const id of ["case-school", "case-journal", "case-source", "case-thumb", "case-large", "case-detail-reviewed"]) {
+    const label = labels.find((match) => match[2].includes(`id="${id}"`));
+    assert.ok(label, `${id} must remain in the DOM`);
+    assert.doesNotMatch(label[1], /\bhidden\b/, `${id} must remain visible`);
+  }
+  assert.match(html, /\.admin-case-editor label\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
 });

@@ -97,7 +97,6 @@ function renderGallery() {
     .map((entry, index) => {
       const school = escape(entry.school);
       const journal = escape(entry.journal);
-      const description = escape(entry.description);
       const categories = escape(entry.categories);
       const title = `${school} · ${journal}`;
       const thumbSource = escape(entry.thumbSrc || entry.largeSrc || placeholderImage);
@@ -107,7 +106,7 @@ function renderGallery() {
           <button class="case-preview" type="button" data-large="${largeSource}" data-title="${title}">
             <img
               src="${thumbSource}"
-              alt="${escape(entry.alt) || `${title} 科研绘图案例`}"
+              alt="${title} 科研绘图作品"
               loading="${index < 3 ? 'eager' : 'lazy'}"
               decoding="async"
               data-large-src="${largeSource}"
@@ -116,8 +115,7 @@ function renderGallery() {
           <div class="case-meta">
             <span>${school}</span>
             <strong>${journal}</strong>
-            <em>${description}</em>
-            ${entry.detailReviewed && entry.caseKey && entry.title && entry.background && entry.challenge && entry.approach && (entry.largeSrc || entry.thumbSrc) ? `<a href="/cases/${encodeURIComponent(entry.caseKey)}/">查看案例</a>` : ''}
+            ${entry.detailReviewed && entry.caseKey && entry.school && entry.journal && (entry.largeSrc || entry.thumbSrc) ? `<a href="/cases/${encodeURIComponent(entry.caseKey)}/">查看案例</a>` : ''}
           </div>
         </article>
       `;
