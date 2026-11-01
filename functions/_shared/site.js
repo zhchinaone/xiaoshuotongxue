@@ -449,11 +449,14 @@ class FeishuBitableService {
       .map((record, index) => {
         const attachments = record.fields[schema.heroFields.image] || [];
         const attachment = attachments[0] || null;
+        const attachmentUrl = attachment?.url || attachment?.tmp_url || "";
         return {
           src: pickDisplayAssetSource(
-            [record.fields[schema.heroFields.localPath] || ""],
             [
-              attachment ? makeProxyUrl(attachment.url || attachment.tmp_url) : "",
+              attachmentUrl ? makeProxyUrl(attachmentUrl) : "",
+              record.fields[schema.heroFields.localPath] || "",
+            ],
+            [
               DEFAULT_CONTENT.heroImages[index]?.src || "",
             ],
             assetManifest,
