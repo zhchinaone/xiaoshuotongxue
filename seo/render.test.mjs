@@ -39,6 +39,15 @@ test('homepage preserves original sections, renders 12 cards, canonical and boot
   assert.match(body, new RegExp(`rel="canonical" href="${origin}/"`));
 });
 
+test('homepage preserves the Baidu ownership verification exactly once inside head', () => {
+  for (const preview of [false, true]) {
+    const { body } = render('/', [entry()], { preview });
+    const head = body.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)[1];
+    assert.match(head, /<meta name="baidu-site-verification" content="codeva-vp7NuHIDpf" \/>/);
+    assert.equal((body.match(/name="baidu-site-verification"/g) || []).length, 1);
+  }
+});
+
 test('pagination is server-rendered, 24 per page, canonical excludes tracking', () => {
   const cases = Array.from({ length: 49 }, (_, i) => entry(i));
   const first = render('/cases/', cases).body;
