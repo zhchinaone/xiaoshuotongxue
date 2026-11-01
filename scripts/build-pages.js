@@ -11,6 +11,8 @@ const STATIC_ITEMS = [
   "script.js",
   "site-config.js",
   "styles.css",
+  "ocr-tool.html",
+  "ocr-tool.js",
   "assets",
 ];
 
@@ -23,6 +25,7 @@ async function main() {
   }
 
   const assetManifest = await collectFiles(path.join(DIST, "assets"), DIST);
+  await fs.writeFile(path.join(DIST, '_routes.json'), JSON.stringify({ version: 1, include: ['/*'], exclude: ['/assets/*', '/*.css', '/*.js', '/asset-manifest.json'] }));
   await fs.writeFile(
     path.join(DIST, "asset-manifest.json"),
     JSON.stringify({ files: assetManifest }, null, 2),

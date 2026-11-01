@@ -88,6 +88,14 @@ export function normalizeIncomingContent(content, fallbackContent = DEFAULT_CONT
         const number = String(index + 1).padStart(2, "0");
         return {
           id: null,
+          caseKey: `case-${number}`,
+          title,
+          researchArea: "",
+          background: "",
+          challenge: "",
+          approach: "",
+          deliverables: "",
+          detailReviewed: false,
           sort: index + 1,
           cacheKey: "",
           school,
@@ -98,6 +106,7 @@ export function normalizeIncomingContent(content, fallbackContent = DEFAULT_CONT
           thumbSrc: "",
           largeSrc: `assets/cases/large/case-${number}-large.jpg`,
           thumbAttachment: null,
+          thumbForToken: "",
           largeAttachment: null,
           published: true,
         };
@@ -105,6 +114,14 @@ export function normalizeIncomingContent(content, fallbackContent = DEFAULT_CONT
 
       return {
         id: entry?.id || null,
+        caseKey: String(entry?.caseKey || entry?.id || createCacheKey("case")).trim(),
+        title: entry?.title || "",
+        researchArea: entry?.researchArea || "",
+        background: entry?.background || "",
+        challenge: entry?.challenge || "",
+        approach: entry?.approach || "",
+        deliverables: entry?.deliverables || "",
+        detailReviewed: entry?.detailReviewed === true,
         sort: Number(entry?.sort || index + 1),
         cacheKey: entry?.cacheKey || "",
         school: entry?.school || "",
@@ -117,6 +134,7 @@ export function normalizeIncomingContent(content, fallbackContent = DEFAULT_CONT
         thumbSrc: entry?.thumbSrc || "",
         largeSrc: entry?.largeSrc || "",
         thumbAttachment: entry?.thumbAttachment || null,
+        thumbForToken: entry?.thumbForToken || "",
         largeAttachment: entry?.largeAttachment || null,
         published: entry?.published !== false,
       };
@@ -129,6 +147,7 @@ export function jsonResponse(payload, status = 200, headers = {}) {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
       ...headers,
     },
   });
@@ -161,8 +180,12 @@ function createCacheKey(prefix) {
   return `${prefix}-${random}`;
 }
 
-function makeProxyUrl(remoteUrl) {
-  return `/api/asset?u=${encodeURIComponent(encodeBase64Url(remoteUrl))}`;
+function attachmentSource(attachment) {
+  if (attachment?.file_token) {
+    return `/api/media?token=${encodeURIComponent(attachment.file_token)}`;
+  }
+  const url = attachment?.url || attachment?.tmp_url;
+  return url ? `/api/asset?u=${encodeURIComponent(encodeBase64Url(url))}` : "";
 }
 
 function pickDisplayAssetSource(preferredSources, fallbackSources = [], assetManifest = null) {
@@ -357,6 +380,13 @@ function normalizeCategoryValue(value) {
   return String(value || "");
 }
 
+function selectHeroRecords(records, fields) {
+  return records
+    .filter((record) => record.fields[fields.image]?.length || String(record.fields[fields.localPath] || "").trim())
+    .sort((a, b) => (a.fields[fields.sort] || 0) - (b.fields[fields.sort] || 0))
+    .slice(0, 3);
+}
+
 async function mapAsyncSeries(items, iteratee) {
   const results = [];
   for (let index = 0; index < items.length; index += 1) {
@@ -437,27 +467,47 @@ class FeishuBitableService {
     return asset;
   }
 
+  async fetchAssetByToken(fileToken) {
+    if (typeof fileToken !== "string" || !fileToken.trim()) {
+      throw new Error("A media file token is required");
+    }
+    return this.fetchAsset(
+      `https://open.feishu.cn/open-apis/drive/v1/medias/${encodeURIComponent(fileToken)}/download`,
+    );
+  }
+
+  async fetchMedia(fileToken) {
+    if (typeof fileToken !== "string" || !fileToken.trim()) {
+      throw new Error("A media file token is required");
+    }
+    const content = await this.loadContent();
+    const attachments = [
+      ...content.heroImages.map((entry) => entry.attachment),
+      ...content.cases.filter((entry) => entry.published !== false)
+        .flatMap((entry) => [entry.thumbAttachment, entry.largeAttachment]),
+    ];
+    if (!attachments.some((attachment) => attachment?.file_token === fileToken)) {
+      const error = new Error("Media token is not attached to public content");
+      error.status = 404;
+      throw error;
+    }
+    return this.fetchAssetByToken(fileToken);
+  }
+
   async loadContent() {
-    const schema = await this.ensureSchema();
-    const heroRecords = await this.listRecords(schema.heroTableId);
-    const workRecords = await this.listRecords(schema.worksTableId);
+    const schema = await this.discoverSchema();
+    const heroRecords = schema.heroTableId ? await this.listRecords(schema.heroTableId) : [];
+    const workRecords = schema.worksTableId ? await this.listRecords(schema.worksTableId) : [];
     const assetManifest = await this.getAssetManifest();
 
-    const heroImages = heroRecords
-      .filter((record) =>
-        record.fields[schema.heroFields.image]?.length ||
-        String(record.fields[schema.heroFields.localPath] || "").trim(),
-      )
-      .sort((a, b) => (a.fields[schema.heroFields.sort] || 0) - (b.fields[schema.heroFields.sort] || 0))
-      .slice(0, 3)
+    const heroImages = selectHeroRecords(heroRecords, schema.heroFields)
       .map((record, index) => {
         const attachments = record.fields[schema.heroFields.image] || [];
         const attachment = attachments[0] || null;
-        const attachmentUrl = attachment?.url || attachment?.tmp_url || "";
         return {
           src: pickDisplayAssetSource(
             [
-              attachmentUrl ? makeProxyUrl(attachmentUrl) : "",
+              attachmentSource(attachment),
               record.fields[schema.heroFields.localPath] || "",
             ],
             [
@@ -486,8 +536,18 @@ class FeishuBitableService {
       .map((record, index) => {
         const thumbAttachment = (record.fields[schema.worksFields.thumb] || [])[0] || null;
         const largeAttachment = (record.fields[schema.worksFields.large] || [])[0] || null;
+        const thumbForToken = record.fields[schema.worksFields.thumbForToken] || "";
+        const thumbnailMatches = !largeAttachment ||
+          Boolean(largeAttachment.file_token && thumbForToken === largeAttachment.file_token);
         return {
           id: record.record_id,
+          caseKey: record.fields[schema.worksFields.caseKey] || record.record_id,
+          ...Object.fromEntries(detailFieldKeys.map((key) => [
+            key,
+            key === "detailReviewed"
+              ? record.fields[schema.worksFields[key]] === true
+              : record.fields[schema.worksFields[key]] || "",
+          ])),
           sort: Number(record.fields[schema.worksFields.sort] || index + 1),
           cacheKey: record.fields[schema.worksFields.cacheKey] || "",
           school: record.fields[schema.worksFields.school] || "",
@@ -496,16 +556,16 @@ class FeishuBitableService {
           categories: normalizeCategoryValue(record.fields[schema.worksFields.categories]),
           alt: record.fields[schema.worksFields.alt] || "",
           thumbSrc: pickDisplayAssetSource(
-            [
+            thumbnailMatches ? [
+              attachmentSource(thumbAttachment),
               record.fields[schema.worksFields.thumbLocal] || "",
-              thumbAttachment ? makeProxyUrl(thumbAttachment.url || thumbAttachment.tmp_url) : "",
-            ],
-            [DEFAULT_CONTENT.cases[index]?.thumbSrc || ""],
+            ] : [],
+            [attachmentSource(largeAttachment)],
             assetManifest,
           ),
           largeSrc: pickDisplayAssetSource(
-            [largeAttachment ? makeProxyUrl(largeAttachment.url || largeAttachment.tmp_url) : ""],
-            [DEFAULT_CONTENT.cases[index]?.largeSrc || ""],
+            [attachmentSource(largeAttachment)],
+            [],
             assetManifest,
           ),
           thumbAttachment: thumbAttachment
@@ -515,6 +575,7 @@ class FeishuBitableService {
                 url: thumbAttachment.url || thumbAttachment.tmp_url,
               }
             : null,
+          thumbForToken,
           largeAttachment: largeAttachment
             ? {
                 file_token: largeAttachment.file_token,
@@ -532,8 +593,49 @@ class FeishuBitableService {
     });
   }
 
-  async saveContent(content, context) {
+  async saveContent(content, context = {}, options = {}) {
     const normalized = normalizeIncomingContent(content);
+    const discovered = await this.discoverSchema();
+    const existingWorks = discovered.worksTableId ? await this.listRecords(discovered.worksTableId) : [];
+    const existingHeroes = discovered.heroTableId ? await this.listRecords(discovered.heroTableId) : [];
+    const byId = new Map(existingWorks.map((record) => [record.record_id, record]));
+    const byKey = new Map();
+    for (const record of existingWorks) {
+      const key = record.fields[schemaWorksFields.caseKey] || record.record_id;
+      if (byKey.has(key)) throw new Error(`Duplicate caseKey: ${key}`);
+      byKey.set(key, record);
+    }
+    const deletedCaseIds = options.deletedCaseIds ?? context.deletedCaseIds ?? [];
+    if (!Array.isArray(deletedCaseIds) || deletedCaseIds.some((id) => !byId.has(id))) {
+      throw new Error("deletedCaseIds must contain existing case record IDs");
+    }
+    const deleted = new Set(deletedCaseIds);
+    const seenKeys = new Set();
+    const seenIds = new Set();
+    normalized.cases.forEach((entry, index) => {
+      if (!entry.caseKey) throw new Error("caseKey must not be empty");
+      const existing = entry.id ? byId.get(entry.id) : byKey.get(entry.caseKey);
+      if (entry.id && !existing) throw new Error(`Unknown case record ID: ${entry.id}`);
+      if (existing) {
+        const key = existing.fields[schemaWorksFields.caseKey] || existing.record_id;
+        if (Object.hasOwn(content.cases[index], "caseKey") && entry.caseKey !== key) {
+          throw new Error(`caseKey cannot change for ${existing.record_id}`);
+        }
+        entry.id = existing.record_id;
+        entry.caseKey = key;
+        entry.cacheKey ||= existing.fields[schemaWorksFields.cacheKey] || "";
+      }
+      if (deleted.has(entry.id)) throw new Error(`Cannot update and delete case: ${entry.id}`);
+      if (seenKeys.has(entry.caseKey) || (entry.id && seenIds.has(entry.id))) {
+        throw new Error(`Duplicate caseKey or record ID: ${entry.caseKey}`);
+      }
+      const owner = byKey.get(entry.caseKey);
+      if (owner && owner.record_id !== entry.id) throw new Error(`Duplicate caseKey: ${entry.caseKey}`);
+      seenKeys.add(entry.caseKey);
+      if (entry.id) seenIds.add(entry.id);
+    });
+    const schema = await this.ensureSchema();
+    context = { env: this.env, request: this.request, ...context, feishuService: this };
     normalized.cases = normalized.cases.map((entry, index) => ({
       ...entry,
       sort: index + 1,
@@ -546,7 +648,8 @@ class FeishuBitableService {
       src: normalizeStaticAssetPath(entry.src),
     }));
 
-    const heroRecords = await mapAsyncSeries(normalized.heroImages, async (entry, index) => ({
+    const heroRecords = await mapAsyncSeries(
+      normalized.heroImages.slice(0, content?.heroImages?.length || 0), async (entry, index) => ({
       fields: {
         [schemaHeroFields.sort]: index + 1,
         [schemaHeroFields.alt]: entry.alt || "",
@@ -560,9 +663,27 @@ class FeishuBitableService {
       },
     }));
 
-    const workRecords = await mapAsyncSeries(normalized.cases, async (entry, index) => ({
+    const workRecords = await mapAsyncSeries(normalized.cases, async (entry, index) => {
+      const large = await this.resolveAttachmentValue(
+        entry.largeSrc, entry.largeAttachment, `${entry.cacheKey}-large`, context,
+      );
+      const thumb = await this.resolveAttachmentValue(
+        entry.thumbSrc, entry.thumbAttachment, `${entry.cacheKey}-thumb`, context,
+      );
+      const raw = content.cases[index];
+      const existingLarge = !Object.hasOwn(raw, "largeSrc") && !Object.hasOwn(raw, "largeAttachment")
+        ? byId.get(entry.id)?.fields[schemaWorksFields.large]?.[0]?.file_token : "";
+      const largeToken = large[0]?.file_token || existingLarge;
+      const uploadedThumb = entry.thumbSrc.startsWith("data:") ||
+        (!entry.thumbAttachment?.file_token && Boolean(thumb[0]?.file_token) && !entry.thumbSrc.startsWith("/api/media?"));
+      return {
+      record_id: entry.id || undefined,
       fields: {
         [schemaWorksFields.sort]: index + 1,
+        [schemaWorksFields.caseKey]: entry.caseKey,
+        ...(uploadedThumb && largeToken
+          ? { [schemaWorksFields.thumbForToken]: largeToken } : {}),
+        ...Object.fromEntries(detailFieldKeys.map((key) => [schemaWorksFields[key], entry[key]])),
         [schemaWorksFields.cacheKey]: entry.cacheKey,
         [schemaWorksFields.school]: entry.school,
         [schemaWorksFields.journal]: entry.journal,
@@ -575,25 +696,35 @@ class FeishuBitableService {
         [schemaWorksFields.thumbLocal]: isLocalStaticAssetPath(entry.thumbSrc)
           ? normalizeStaticAssetPath(entry.thumbSrc)
           : "",
-        [schemaWorksFields.thumb]: await this.resolveAttachmentValue(
-          entry.thumbSrc,
-          entry.thumbAttachment,
-          `${entry.cacheKey || `case-${index + 1}`}-thumb`,
-          context,
-        ),
-        [schemaWorksFields.large]: await this.resolveAttachmentValue(
-          entry.largeSrc,
-          entry.largeAttachment,
-          `${entry.cacheKey || `case-${index + 1}`}-large`,
-          context,
-        ),
+        [schemaWorksFields.thumb]: thumb,
+        [schemaWorksFields.large]: large,
         [schemaWorksFields.published]: entry.published !== false,
       },
-    }));
+    };
+    });
 
-    const schema = await this.ensureSchema();
-    await this.replaceTableRecords(schema.heroTableId, heroRecords);
-    await this.replaceTableRecords(schema.worksTableId, workRecords);
+    // Omitted fields are not a request to clear existing data.
+    workRecords.forEach((record, index) => {
+      if (!record.record_id) return;
+      const raw = content.cases[index];
+      for (const key of Object.keys(schemaWorksFields)) {
+        if (["caseKey", "cacheKey", "sort", "thumbForToken"].includes(key)) continue;
+        const inputKey = { thumbLocal: "thumbSrc", thumb: "thumbAttachment", large: "largeAttachment" }[key] || key;
+        const sourceKey = key === "thumb" ? "thumbSrc" : key === "large" ? "largeSrc" : null;
+        if (!Object.hasOwn(raw, inputKey) && !(sourceKey && Object.hasOwn(raw, sourceKey))) {
+          delete record.fields[schemaWorksFields[key]];
+        }
+      }
+    });
+    if (Array.isArray(content?.heroImages)) {
+      const orderedHeroes = selectHeroRecords(existingHeroes, schemaHeroFields);
+      const submittedHeroes = heroRecords.slice(0, content.heroImages.length);
+      submittedHeroes.forEach((record, index) => {
+        record.record_id = orderedHeroes[index]?.record_id;
+      });
+      await this.updateTableRecords(schema.heroTableId, submittedHeroes);
+    }
+    await this.updateTableRecords(schema.worksTableId, workRecords, [...deleted]);
     return this.loadContent();
   }
 
@@ -606,6 +737,11 @@ class FeishuBitableService {
 
     if (attachmentMeta?.file_token) {
       return [{ file_token: attachmentMeta.file_token }];
+    }
+
+    if (source?.startsWith("/api/media?")) {
+      const token = new URL(source, "https://placeholder.local").searchParams.get("token");
+      if (token) return [{ file_token: token }];
     }
 
     if (source) {
@@ -647,14 +783,16 @@ class FeishuBitableService {
     });
   }
 
-  async replaceTableRecords(tableId, records) {
-    const existing = await this.listRecords(tableId);
-    const recordIds = existing.map((item) => item.record_id).filter(Boolean);
-
-    if (recordIds.length) {
-      for (const chunk of chunkArray(recordIds, 500)) {
+  async updateTableRecords(tableId, records, deletedRecordIds = []) {
+    for (const [operation, items] of [
+      ["batch_update", records.filter((record) => record.record_id)],
+      ["batch_create", records.filter((record) => !record.record_id)
+        .map(({ fields }) => ({ fields }))],
+      ["batch_delete", deletedRecordIds],
+    ]) {
+      for (const chunk of chunkArray(items, 500)) {
         await this.api(
-          `/bitable/v1/apps/${this.config.appToken}/tables/${tableId}/records/batch_delete`,
+          `/bitable/v1/apps/${this.config.appToken}/tables/${tableId}/records/${operation}`,
           {
             method: "POST",
             body: {
@@ -665,21 +803,16 @@ class FeishuBitableService {
       }
     }
 
-    if (!records.length) {
-      return;
-    }
+  }
 
-    for (const chunk of chunkArray(records, 500)) {
-      await this.api(
-        `/bitable/v1/apps/${this.config.appToken}/tables/${tableId}/records/batch_create`,
-        {
-          method: "POST",
-          body: {
-            records: chunk,
-          },
-        },
-      );
-    }
+  async discoverSchema() {
+    const tables = await this.listTables();
+    return {
+      heroTableId: tables.find((item) => item.name === this.config.heroTableName)?.table_id || null,
+      worksTableId: tables.find((item) => item.name === this.config.worksTableName)?.table_id || null,
+      heroFields: schemaHeroFields,
+      worksFields: schemaWorksFields,
+    };
   }
 
   async ensureSchema() {
@@ -705,6 +838,10 @@ class FeishuBitableService {
     await this.ensureFields(worksTable.table_id, [
       { name: "排序", type: 2 },
       { name: "缓存键", type: 1 },
+      { name: schemaWorksFields.caseKey, type: 1 },
+      ...detailFieldKeys.map((key) => ({
+        name: schemaWorksFields[key], type: key === "detailReviewed" ? 7 : 1,
+      })),
       { name: "学校机构", type: 1 },
       { name: "期刊年份", type: 1 },
       { name: "作品说明", type: 1 },
@@ -723,6 +860,7 @@ class FeishuBitableService {
       },
       { name: "图片替代文字", type: 1 },
       { name: "缩略图本地缓存", type: 1 },
+      { name: schemaWorksFields.thumbForToken, type: 1 },
       { name: "缩略图", type: 17 },
       { name: "大图", type: 17 },
       { name: "是否发布", type: 7 },
@@ -900,6 +1038,14 @@ const schemaHeroFields = {
 
 const schemaWorksFields = {
   sort: "排序",
+  caseKey: "案例键",
+  title: "案例标题",
+  researchArea: "研究领域",
+  background: "研究背景",
+  challenge: "表达难点",
+  approach: "绘图思路",
+  deliverables: "交付内容",
+  detailReviewed: "详情已审核",
   cacheKey: "缓存键",
   school: "学校机构",
   journal: "期刊年份",
@@ -907,9 +1053,14 @@ const schemaWorksFields = {
   categories: "分类",
   alt: "图片替代文字",
   thumbLocal: "缩略图本地缓存",
+  thumbForToken: "缩略图原图标识",
   thumb: "缩略图",
   large: "大图",
   published: "是否发布",
 };
+
+const detailFieldKeys = [
+  "title", "researchArea", "background", "challenge", "approach", "deliverables", "detailReviewed",
+];
 
 export { DEFAULT_CONTENT, EMPTY_CONTENT };

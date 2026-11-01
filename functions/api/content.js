@@ -5,6 +5,7 @@ import {
   normalizeIncomingContent,
   readJsonBody,
 } from "../_shared/site.js";
+import { loadPublicContent, invalidateContent } from '../_shared/content.js';
 
 export async function onRequestGet(context) {
   const feishuService = createFeishuService(context.env, context.request);
@@ -18,7 +19,7 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const content = await feishuService.loadContent();
+    const content = await loadPublicContent(context.env, context.request);
     return jsonResponse({
       ok: true,
       mode: "feishu",
@@ -26,12 +27,7 @@ export async function onRequestGet(context) {
     });
   } catch (error) {
     console.warn("Failed to load Feishu content, falling back to default:", error.message);
-    return jsonResponse({
-      ok: true,
-      mode: "default",
-      content: DEFAULT_CONTENT,
-      warning: "Feishu content could not be loaded. Showing default content.",
-    });
+    return jsonResponse({ ok: false, error: 'Content temporarily unavailable' }, 503, { 'Retry-After': '60', 'Cache-Control': 'no-store' });
   }
 }
 
@@ -54,7 +50,9 @@ export async function onRequestPost(context) {
       env: context.env,
       request: context.request,
       feishuService,
+      deletedCaseIds: body.deletedCaseIds || [],
     });
+    invalidateContent(context.env);
 
     return jsonResponse({
       ok: true,
