@@ -48,6 +48,15 @@ test('homepage preserves the Baidu ownership verification exactly once inside he
   }
 });
 
+test('homepage preserves the Google ownership verification exactly once inside head', () => {
+  for (const preview of [false, true]) {
+    const { body } = render('/', [entry()], { preview });
+    const head = body.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)[1];
+    assert.match(head, /<meta name="google-site-verification" content="jt6_xLtZocnKy2F7KJQ3Q6KPzPMttt_k8qJZ_hsqFh4" \/>/);
+    assert.equal((body.match(/name="google-site-verification"/g) || []).length, 1);
+  }
+});
+
 test('pagination is server-rendered, 24 per page, canonical excludes tracking', () => {
   const cases = Array.from({ length: 49 }, (_, i) => entry(i));
   const first = render('/cases/', cases).body;
