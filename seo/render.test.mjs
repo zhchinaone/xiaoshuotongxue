@@ -213,3 +213,18 @@ test('minimal reviewed cases need no title, long copy or year, and explicit year
   assert.match(render('/cases/', [withYear]).body, /<span>2024<\/span>/);
   assert.match(render('/cases/sample-0/', [withYear]).body, /content="Institution 0 · 2024 · Provided journal"/);
 });
+
+test('year extraction separates combined journal facts and respects explicit year', () => {
+  for (const journal of ['Journal · 2023', '2023 | Journal', 'Journal / 2023', 'Journal - 2023']) {
+    const { body, status } = render('/cases/sample-0/', [entry(0, { journal })]);
+    assert.equal(status, 200);
+    assert.match(body, /<dt>年份<\/dt><dd>2023<\/dd>/);
+    assert.match(body, /<dt>期刊<\/dt><dd>Journal<\/dd>/);
+    assert.equal(scripts(body)[0]['@graph'][0].description, 'Institution 0 · 2023 · Journal');
+  }
+  const explicit = render('/cases/sample-0/', [entry(0, { journal: 'Journal · 2023', year: '2024' })]).body;
+  assert.match(explicit, /<dt>年份<\/dt><dd>2024<\/dd>/);
+  assert.match(explicit, /<dt>期刊<\/dt><dd>Journal<\/dd>/);
+  const unknown = render('/cases/sample-0/', [entry(0, { journal: 'Journal 12023' })]).body;
+  assert.doesNotMatch(unknown, /<dt>年份<\/dt>/);
+});
