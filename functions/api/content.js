@@ -11,6 +11,9 @@ export async function onRequestGet(context) {
   const feishuService = createFeishuService(context.env, context.request);
 
   if (!feishuService.isConfigured()) {
+    if (context.env.CF_PAGES_BRANCH || context.env.CF_PAGES) {
+      return jsonResponse({ ok: false, error: 'Feishu configuration missing in deployed environment' }, 503, { 'Retry-After': '60' });
+    }
     return jsonResponse({
       ok: true,
       mode: "default",
