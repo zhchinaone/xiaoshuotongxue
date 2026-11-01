@@ -14,6 +14,8 @@ New Feishu fields: 案例键, 案例标题, 研究领域, 研究背景, 表达�
 
 The public snapshot expires after five minutes. Admin saves invalidate the current process snapshot; other edge instances refresh at expiry. No long-lived HTML cache is added. Content-read failure returns 503 rather than a different set of default artworks.
 
+Preview deployments are read-only: POST /api/content returns 403, so review cannot accidentally modify the production Feishu tables. Make content edits in Feishu or the existing production admin instead.
+
 New uploads retain their original large file and generate WebP thumbnails. A thumbnail is used with a large attachment only when its recorded source token matches that attachment. Replacing a large file directly in Feishu therefore uses the new original until a matching thumbnail is uploaded. No existing thumbnail is silently certified as matching.
 
 ## Migration and tests

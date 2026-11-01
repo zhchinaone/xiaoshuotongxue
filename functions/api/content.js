@@ -35,6 +35,9 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPost(context) {
+  if (context.env.CF_PAGES_BRANCH && context.env.CF_PAGES_BRANCH !== 'main') {
+    return jsonResponse({ ok: false, error: '预览环境为只读，请在飞书或正式后台修改作品。' }, 403);
+  }
   const feishuService = createFeishuService(context.env, context.request);
   if (!feishuService.isConfigured()) {
     return jsonResponse(
