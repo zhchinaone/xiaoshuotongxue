@@ -1,9 +1,13 @@
 const http = require("node:http");
+const { execFile } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { URL } = require("node:url");
+const { promisify } = require("node:util");
+
+const execFileAsync = promisify(execFile);
 
 const ROOT = __dirname;
 const MIME_TYPES = {
@@ -74,6 +78,16 @@ async function handleApiRequest(request, response, requestUrl) {
       message: feishuService.isConfigured()
         ? "Feishu Bitable is configured."
         : "Feishu credentials are missing. Fill .env to enable cloud sync.",
+    });
+    return;
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/api/automation/click") {
+    const body = await readJsonBody(request);
+    const clickResult = await clickAtPoint(body || {});
+    sendJson(response, 200, {
+      ok: true,
+      clicked: clickResult,
     });
     return;
   }
@@ -291,6 +305,52 @@ async function readJsonBody(request) {
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   return raw ? JSON.parse(raw) : {};
+}
+
+async function clickAtPoint(input) {
+  if (process.platform !== "win32") {
+    throw new Error("Auto click is only available on Windows.");
+  }
+
+  const x = Number.parseInt(input.x, 10);
+  const y = Number.parseInt(input.y, 10);
+  const button = input.button === "right" ? "right" : "left";
+  const delayMs = Number.isFinite(Number(input.delayMs)) ? Math.max(0, Math.round(Number(input.delayMs))) : 80;
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new Error("Invalid click coordinates.");
+  }
+
+  const script = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class MouseHelper {
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, UIntPtr dwExtraInfo);
+  public const uint LEFTDOWN = 0x0002;
+  public const uint LEFTUP = 0x0004;
+  public const uint RIGHTDOWN = 0x0008;
+  public const uint RIGHTUP = 0x0010;
+}
+"@
+[MouseHelper]::SetCursorPos(${x}, ${y}) | Out-Null
+Start-Sleep -Milliseconds ${delayMs}
+if ("${button}" -eq "right") {
+  [MouseHelper]::mouse_event([MouseHelper]::RIGHTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+  [MouseHelper]::mouse_event([MouseHelper]::RIGHTUP, 0, 0, 0, [UIntPtr]::Zero)
+} else {
+  [MouseHelper]::mouse_event([MouseHelper]::LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+  [MouseHelper]::mouse_event([MouseHelper]::LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
+}
+`;
+
+  await execFileAsync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
+    windowsHide: true,
+    timeout: Math.max(3000, delayMs + 3000),
+  });
+
+  return { x, y, button, delayMs };
 }
 
 class FeishuBitableService {

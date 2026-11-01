@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>本地 OCR 小工具</title>
+    <meta name="description" content="自动截图、自动 OCR，并导出 Excel 和 Markdown 数据库。" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="admin-body ocr-body">
+    <header class="admin-topbar">
+      <a class="brand" href="index.html" aria-label="返回官网">
+        <span class="brand-mark brand-mark-image">
+          <img src="assets/brand/xiaoshuotongxue-logo.jpg" alt="小硕同学品牌标志" />
+        </span>
+        <span class="brand-text">
+          <strong>本地 OCR 小工具</strong>
+          <small>Capture · OCR · Export</small>
+        </span>
+      </a>
+      <div class="admin-actions">
+        <a class="button button-ghost" href="admin.html">返回后台</a>
+        <button class="button button-ghost" type="button" id="pick-folder">选择输出目录</button>
+        <button class="button button-primary" type="button" id="start-capture">开始采集</button>
+        <button class="button button-ghost" type="button" id="stop-capture" disabled>停止</button>
+        <button class="button button-ghost" type="button" id="export-now">保存并点击</button>
+      </div>
+    </header>
+
+    <main class="admin-shell ocr-shell">
+      <section class="admin-intro">
+        <p class="eyebrow">Local Utility</p>
+        <h1>自动截图，自动 OCR，导出 Excel / Markdown。</h1>
+        <p>
+          先点“开始采集”，浏览器会让你选一个屏幕或窗口。采集时会按间隔自动抓图并识别文字；点“保存并点击”会把数据库导出到文件夹或下载里，然后自动点你指定的位置。
+        </p>
+        <p class="admin-status" id="tool-status">尚未开始采集。</p>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-heading">
+          <div>
+            <p class="eyebrow">Settings</p>
+            <h2>采集参数</h2>
+          </div>
+          <p id="output-target">输出：默认下载</p>
+        </div>
+
+        <div class="ocr-control-grid">
+          <label class="ocr-field">
+            <span>采集间隔（秒）</span>
+            <input id="interval-seconds" type="number" min="0.5" step="0.5" value="3" />
+          </label>
+          <label class="ocr-field">
+            <span>OCR 语言</span>
+            <input id="ocr-language" type="text" value="chi_sim+eng" />
+          </label>
+          <label class="ocr-field">
+            <span>导出文件名</span>
+            <input id="base-name" type="text" value="ocr-database" />
+          </label>
+          <label class="ocr-field">
+            <span>自动点击延迟（毫秒）</span>
+            <input id="click-delay" type="number" min="0" step="50" value="600" />
+          </label>
+          <label class="ocr-field">
+            <span>点击 X</span>
+            <input id="click-x" type="number" step="1" value="0" />
+          </label>
+          <label class="ocr-field">
+            <span>点击 Y</span>
+            <input id="click-y" type="number" step="1" value="0" />
+          </label>
+          <label class="ocr-toggle">
+            <input id="auto-click" type="checkbox" checked />
+            <span>保存后自动点击</span>
+          </label>
+          <label class="ocr-toggle">
+            <input id="save-shots" type="checkbox" checked />
+            <span>同时保存截图 PNG（选目录时）</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="ocr-stage">
+        <section class="ocr-panel">
+          <div class="ocr-panel-head">
+            <div>
+              <p class="eyebrow">Preview</p>
+              <h2>实时画面</h2>
+            </div>
+            <span class="ocr-chip" id="record-count">0 条记录</span>
+          </div>
+          <video id="preview-video" class="ocr-video" autoplay muted playsinline></video>
+          <canvas id="capture-canvas" class="ocr-canvas" hidden></canvas>
+          <div class="ocr-live-text">
+            <strong>最近识别结果</strong>
+            <pre id="live-text">等待采集。</pre>
+          </div>
+        </section>
+
+        <section class="ocr-panel">
+          <div class="ocr-panel-head">
+            <div>
+              <p class="eyebrow">Database</p>
+              <h2>OCR 记录</h2>
+            </div>
+            <button class="button button-ghost" type="button" id="clear-records">清空记录</button>
+          </div>
+          <div class="ocr-table-wrap">
+            <table class="ocr-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>时间</th>
+                  <th>置信度</th>
+                  <th>截图</th>
+                  <th>OCR 文本</th>
+                </tr>
+              </thead>
+              <tbody id="records-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="ocr-tool.js"></script>
+  </body>
+</html>

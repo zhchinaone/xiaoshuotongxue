@@ -25,6 +25,12 @@ http://localhost:3000
 http://localhost:3000/admin.html
 ```
 
+4. 打开 OCR 小工具：
+
+```text
+http://localhost:3000/ocr-tool.html
+```
+
 后台里可以直接：
 
 - 上传首页三张图
@@ -33,6 +39,19 @@ http://localhost:3000/admin.html
 - 勾选分类
 - 新增、复制、删除作品
 - 导出和导入配置
+
+OCR 小工具会做这些事：
+
+- 按间隔自动截屏
+- 自动识别文字
+- 导出 `.xlsx` 和 `.md`
+- 可选保存截图 PNG
+- 保存后自动点击指定屏幕坐标
+
+说明：
+
+- 自动点击目前只在 Windows 上启用
+- 选择输出目录后，截图 PNG 会一起写入 `screenshots/`
 
 ## 本地 `.env` 怎么配
 
@@ -143,6 +162,7 @@ FEISHU_WORKS_TABLE_NAME
 ## 主要文件说明
 
 - `server.js`：本地 Node 后端
+- `ocr-tool.html` / `ocr-tool.js`：本地 OCR 小工具
 - `functions/api/*`：Cloudflare Pages Functions 接口
 - `admin.html` / `admin.js`：可视化内容管理页
 - `index.html` / `script.js`：官网展示页
