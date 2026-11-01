@@ -67,7 +67,7 @@ async function loadSiteContent() {
 }
 
 function applyHeroImages() {
-  document.querySelectorAll(".hero-image").forEach((image, index) => {
+  document.querySelectorAll(".hero-showcase-image").forEach((image, index) => {
     const imageConfig = getHeroImages()[index];
 
     if (!imageConfig) {
