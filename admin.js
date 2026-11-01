@@ -19,6 +19,8 @@ let state = localFallbackContent;
 let selectedCaseIndex = 0;
 let isDirty = false;
 let apiMode = "default";
+const deletedCaseIds = new Set();
+const persistedCases = new Map();
 
 const heroManager = document.querySelector("#hero-manager");
 const caseList = document.querySelector("#case-list");
@@ -41,6 +43,46 @@ const largeInput = document.querySelector("#case-large");
 const thumbPreview = document.querySelector("#thumb-preview");
 const largePreview = document.querySelector("#large-preview");
 const categoryGrid = document.querySelector("#category-grid");
+const caseKeyInput = document.querySelector("#case-key");
+const detailReviewedInput = document.querySelector("#case-detail-reviewed");
+const seoInputs = {
+  title: document.querySelector("#case-title"),
+  researchArea: document.querySelector("#case-research-area"),
+  background: document.querySelector("#case-background"),
+  challenge: document.querySelector("#case-challenge"),
+  approach: document.querySelector("#case-approach"),
+  deliverables: document.querySelector("#case-deliverables"),
+};
+
+function prepareContent(content) {
+  const normalized = contentStore.normalizeConfig(content);
+  normalized.cases.forEach((entry) => {
+    if (!entry.caseKey) entry.caseKey = crypto.randomUUID();
+  });
+  contentStore.validateCases(normalized.cases);
+  return normalized;
+}
+
+function rememberPersistedCases() {
+  state.cases.forEach((entry) => {
+    if (entry.id) persistedCases.set(entry.id, { caseKey: entry.caseKey, published: entry.published });
+  });
+}
+
+function validateIdentity(content) {
+  contentStore.validateCases(content.cases);
+  for (const entry of content.cases) {
+    const existing = persistedCases.get(entry.id);
+    if (existing && (entry.caseKey !== existing.caseKey || entry.published !== existing.published)) {
+      throw new Error("已有作品的 caseKey 和发布状态不可通过导入更改");
+    }
+    for (const [id, saved] of persistedCases) {
+      if (saved.caseKey === entry.caseKey && id !== entry.id) {
+        throw new Error("已有作品的记录 id 不可更改");
+      }
+    }
+  }
+}
 
 function getSelectedCase() {
   return state.cases[selectedCaseIndex];
@@ -71,7 +113,7 @@ function escapeHtml(value) {
 }
 
 function caseTitle(entry) {
-  return entry.school || entry.journal || "未命名作品";
+  return entry.title || entry.school || entry.journal || "未命名作品";
 }
 
 async function loadRemoteContent() {
@@ -96,6 +138,7 @@ async function loadRemoteContent() {
 }
 
 async function saveRemoteContent() {
+  validateIdentity(state);
   const response = await fetch("/api/content", {
     method: "POST",
     headers: {
@@ -104,6 +147,7 @@ async function saveRemoteContent() {
     },
     body: JSON.stringify({
       content: state,
+      deletedCaseIds: Array.from(deletedCaseIds).filter((id) => !state.cases.some((entry) => entry.id === id)),
     }),
   });
 
@@ -233,6 +277,11 @@ function renderCaseEditor() {
   }
 
   schoolInput.value = entry.school || "";
+  caseKeyInput.value = entry.caseKey;
+  for (const [field, input] of Object.entries(seoInputs)) {
+    input.value = entry[field] || "";
+  }
+  detailReviewedInput.checked = entry.detailReviewed === true;
   journalInput.value = entry.journal || "";
   descriptionInput.value = entry.description || "";
   altInput.value = entry.alt || "";
@@ -247,6 +296,17 @@ function renderCaseEditor() {
 }
 
 function bindTextInputs() {
+  for (const [field, input] of Object.entries(seoInputs)) {
+    input.addEventListener("input", () => {
+      getSelectedCase()[field] = input.value.trim();
+      if (field === "title") renderCaseList();
+      markDirty();
+    });
+  }
+  detailReviewedInput.addEventListener("change", () => {
+    getSelectedCase().detailReviewed = detailReviewedInput.checked;
+    markDirty();
+  });
   schoolInput.addEventListener("input", () => {
     getSelectedCase().school = schoolInput.value.trim();
     if (!altInput.value.trim()) {
@@ -286,27 +346,25 @@ function bindImageInputs() {
       return;
     }
 
+    const entry = getSelectedCase();
     try {
       const [thumbResult, largeResult] = await Promise.all([
         contentStore.processImageFile(file, {
           maxWidth: 1200,
           maxHeight: 1200,
           quality: 0.82,
+          mimeType: "image/webp",
         }),
-        contentStore.processImageFile(file, {
-          maxWidth: 2400,
-          maxHeight: 2400,
-          quality: 0.86,
-        }),
+        contentStore.readOriginalImageFile(file),
       ]);
 
-      getSelectedCase().thumbSrc = thumbResult.src;
-      getSelectedCase().largeSrc = largeResult.src;
-      getSelectedCase().thumbAttachment = null;
-      getSelectedCase().largeAttachment = null;
+      entry.thumbSrc = thumbResult.src;
+      entry.largeSrc = largeResult.src;
+      entry.thumbAttachment = null;
+      entry.largeAttachment = null;
       renderCaseList();
       renderCaseEditor();
-      markDirty("已根据一张原图自动生成缩略图和大图，记得保存。");
+      markDirty("已保留完整原图并生成 WebP 预览图，记得保存。");
     } catch (error) {
       setStatus(error.message || "原图处理失败。", true);
     }
@@ -318,17 +376,19 @@ function bindImageInputs() {
       return;
     }
 
+    const entry = getSelectedCase();
     try {
       const result = await contentStore.processImageFile(file, {
         maxWidth: 1200,
         maxHeight: 1200,
         quality: 0.82,
+        mimeType: "image/webp",
       });
-      getSelectedCase().thumbSrc = result.src;
-      getSelectedCase().thumbAttachment = null;
+      entry.thumbSrc = result.src;
+      entry.thumbAttachment = null;
       renderCaseList();
       renderCaseEditor();
-      markDirty("缩略图已上传，记得保存。");
+      markDirty("WebP 预览图已生成，记得保存。");
     } catch (error) {
       setStatus(error.message || "缩略图上传失败。", true);
     }
@@ -340,16 +400,13 @@ function bindImageInputs() {
       return;
     }
 
+    const entry = getSelectedCase();
     try {
-      const result = await contentStore.processImageFile(file, {
-        maxWidth: 2400,
-        maxHeight: 2400,
-        quality: 0.86,
-      });
-      getSelectedCase().largeSrc = result.src;
-      getSelectedCase().largeAttachment = null;
+      const result = await contentStore.readOriginalImageFile(file);
+      entry.largeSrc = result.src;
+      entry.largeAttachment = null;
       renderCaseEditor();
-      markDirty("大图已上传，记得保存。");
+      markDirty("完整原图已上传，记得保存。");
     } catch (error) {
       setStatus(error.message || "大图上传失败。", true);
     }
@@ -358,6 +415,14 @@ function bindImageInputs() {
 
 function createEmptyCase() {
   return {
+    caseKey: crypto.randomUUID(),
+    title: "",
+    researchArea: "",
+    background: "",
+    challenge: "",
+    approach: "",
+    deliverables: "",
+    detailReviewed: false,
     cacheKey: "",
     school: "",
     journal: "",
@@ -384,6 +449,8 @@ function bindActions() {
   duplicateCaseButton.addEventListener("click", () => {
     const duplicated = contentStore.clone(getSelectedCase());
     duplicated.id = null;
+    duplicated.caseKey = crypto.randomUUID();
+    duplicated.detailReviewed = false;
     duplicated.cacheKey = "";
     state.cases.splice(selectedCaseIndex + 1, 0, duplicated);
     selectedCaseIndex += 1;
@@ -398,6 +465,8 @@ function bindActions() {
       return;
     }
 
+    const entry = getSelectedCase();
+    if (entry.id) deletedCaseIds.add(entry.id);
     state.cases.splice(selectedCaseIndex, 1);
     selectedCaseIndex = Math.max(0, selectedCaseIndex - 1);
     renderCaseList();
@@ -407,7 +476,11 @@ function bindActions() {
 
   saveButton.addEventListener("click", async () => {
     try {
-      state = await saveRemoteContent();
+      state = prepareContent(await saveRemoteContent());
+      deletedCaseIds.clear();
+      persistedCases.clear();
+      rememberPersistedCases();
+      selectedCaseIndex = Math.min(selectedCaseIndex, state.cases.length - 1);
       renderHeroManager();
       renderCaseList();
       renderCaseEditor();
@@ -422,7 +495,7 @@ function bindActions() {
   });
 
   resetButton.addEventListener("click", async () => {
-    state = contentStore.clone(localFallbackContent);
+    state = prepareContent(contentStore.clone(localFallbackContent));
     selectedCaseIndex = 0;
     renderHeroManager();
     renderCaseList();
@@ -449,14 +522,16 @@ function bindActions() {
 
     try {
       const text = await file.text();
-      state = JSON.parse(text);
+      const imported = contentStore.importConfig(text);
+      validateIdentity(imported);
+      state = imported;
       selectedCaseIndex = 0;
       renderHeroManager();
       renderCaseList();
       renderCaseEditor();
       markDirty("配置已导入，记得点击保存。");
     } catch (error) {
-      setStatus("导入失败，请确认选择的是本站导出的 JSON。", true);
+      setStatus(`导入失败：${error.message}`, true);
     } finally {
       importInput.value = "";
     }
@@ -464,7 +539,8 @@ function bindActions() {
 }
 
 async function init() {
-  state = await loadRemoteContent();
+  state = prepareContent(await loadRemoteContent());
+  rememberPersistedCases();
   renderHeroManager();
   renderCaseList();
   renderCaseEditor();

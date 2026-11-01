@@ -11,6 +11,7 @@
 
   function normalizeHeroImage(entry, fallback) {
     return {
+      ...entry,
       src: entry?.src || fallback?.src || "",
       alt: entry?.alt || fallback?.alt || "",
     };
@@ -20,6 +21,14 @@
     const number = padCaseNumber(index);
     const fallback = {
       cacheKey: "",
+      caseKey: "",
+      title: "",
+      researchArea: "",
+      background: "",
+      challenge: "",
+      approach: "",
+      deliverables: "",
+      detailReviewed: false,
       school: "",
       journal: "",
       description: "",
@@ -52,11 +61,13 @@
     const title = [school, journal].filter(Boolean).join(" · ");
 
     return {
-        ...fallback,
-        cacheKey: entry?.cacheKey || fallback.cacheKey,
-        ...entry,
-        school,
-        journal,
+      ...fallback,
+      cacheKey: entry?.cacheKey || fallback.cacheKey,
+      ...entry,
+      caseKey: String(entry?.caseKey || entry?.id || "").trim(),
+      detailReviewed: entry?.detailReviewed === true,
+      school,
+      journal,
       description,
       categories,
       thumbSrc: entry?.thumbSrc || fallback.thumbSrc,
@@ -110,7 +121,53 @@
 
   function importConfig(text) {
     const parsed = JSON.parse(text);
-    return normalizeConfig(parsed);
+    if (!parsed || !Array.isArray(parsed.heroImages) || !Array.isArray(parsed.cases) || !parsed.cases.length ||
+        parsed.cases.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))) {
+      throw new Error("配置格式无效");
+    }
+    const normalized = normalizeConfig(parsed);
+    validateCases(normalized.cases);
+    return normalized;
+  }
+
+  function validateCases(cases) {
+    const keys = new Set();
+    const ids = new Set();
+    for (const entry of cases) {
+      const key = entry.caseKey;
+      if (typeof key !== "string" || !key.trim() || key !== key.trim()) {
+        throw new Error("每个作品都必须有 caseKey");
+      }
+      if (keys.has(key)) {
+        throw new Error(`caseKey 重复：${key}`);
+      }
+      keys.add(key);
+      if (entry.id != null) {
+        if (typeof entry.id !== "string" || !entry.id.trim() || ids.has(entry.id)) {
+          throw new Error("作品记录 id 无效或重复");
+        }
+        ids.add(entry.id);
+      }
+      for (const field of ["title", "researchArea", "background", "challenge", "approach", "deliverables"]) {
+        if (typeof entry[field] !== "string") {
+          throw new Error(`作品字段 ${field} 必须为文字`);
+        }
+      }
+    }
+  }
+
+  function readOriginalImageFile(file) {
+    return new Promise((resolve, reject) => {
+      if (!file || !file.type.startsWith("image/")) {
+        reject(new Error("请选择图片文件"));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve({ src: reader.result });
+      reader.onerror = () => reject(new Error("原图读取失败"));
+      reader.onabort = () => reject(new Error("原图读取已取消"));
+      reader.readAsDataURL(file);
+    });
   }
 
   function processImageFile(file, options) {
@@ -118,6 +175,7 @@
       maxWidth: options?.maxWidth || 2400,
       maxHeight: options?.maxHeight || 2400,
       quality: options?.quality || 0.86,
+      mimeType: options?.mimeType,
     };
 
     return new Promise((resolve, reject) => {
@@ -130,26 +188,34 @@
       const objectUrl = URL.createObjectURL(file);
 
       image.onload = () => {
-        const scale = Math.min(
-          1,
-          settings.maxWidth / image.width,
-          settings.maxHeight / image.height,
-        );
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(image.width * scale));
-        canvas.height = Math.max(1, Math.round(image.height * scale));
+        try {
+          const scale = Math.min(
+            1,
+            settings.maxWidth / image.width,
+            settings.maxHeight / image.height,
+          );
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
 
-        const context = canvas.getContext("2d");
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const context = canvas.getContext("2d");
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-        const mimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
-        const src =
-          mimeType === "image/png"
-            ? canvas.toDataURL(mimeType)
-            : canvas.toDataURL(mimeType, settings.quality);
+          const mimeType = settings.mimeType || (file.type === "image/png" ? "image/png" : "image/jpeg");
+          const src =
+            mimeType === "image/png"
+              ? canvas.toDataURL(mimeType)
+              : canvas.toDataURL(mimeType, settings.quality);
 
-        URL.revokeObjectURL(objectUrl);
-        resolve({ src, width: canvas.width, height: canvas.height });
+          if (settings.mimeType && !src.startsWith(`data:${settings.mimeType};`)) {
+            throw new Error("浏览器不支持所需图片格式");
+          }
+          resolve({ src, width: canvas.width, height: canvas.height });
+        } catch (error) {
+          reject(error);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
       };
 
       image.onerror = () => {
@@ -168,7 +234,9 @@
     loadConfig,
     normalizeConfig,
     processImageFile,
+    readOriginalImageFile,
     resetConfig,
     saveConfig,
+    validateCases,
   };
 })();

@@ -3,9 +3,27 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>小硕科研绘图 | 内容管理</title>
     <meta name="description" content="可视化上传和编辑小硕科研绘图官网内容。" />
     <link rel="stylesheet" href="styles.css" />
+    <style>
+      .admin-case-editor label[hidden] {
+        display: none !important;
+      }
+
+      .admin-field textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 12px 14px;
+        border: 1px solid rgba(29, 29, 31, 0.12);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        resize: vertical;
+      }
+    </style>
   </head>
   <body class="admin-body">
     <header class="admin-topbar">
@@ -80,6 +98,38 @@
               </div>
 
               <div class="admin-form-grid">
+                <label class="admin-field admin-field-full" hidden>
+                  <span>案例标识</span>
+                  <input id="case-key" type="text" readonly />
+                </label>
+                <label class="admin-field admin-field-full" hidden>
+                  <span>案例标题</span>
+                  <input id="case-title" type="text" />
+                </label>
+                <label class="admin-field admin-field-full" hidden>
+                  <span>研究方向</span>
+                  <input id="case-research-area" type="text" />
+                </label>
+                <label class="admin-field admin-field-full" hidden>
+                  <span>研究背景</span>
+                  <textarea id="case-background" rows="4"></textarea>
+                </label>
+                <label class="admin-field admin-field-full" hidden>
+                  <span>绘图挑战</span>
+                  <textarea id="case-challenge" rows="4"></textarea>
+                </label>
+                <label class="admin-field admin-field-full" hidden>
+                  <span>解决思路</span>
+                  <textarea id="case-approach" rows="4"></textarea>
+                </label>
+                <label class="admin-field admin-field-full" hidden>
+                  <span>交付成果</span>
+                  <textarea id="case-deliverables" rows="4"></textarea>
+                </label>
+                <label class="admin-tag-option">
+                  <input id="case-detail-reviewed" type="checkbox" />
+                  <span>已确认学校、期刊年份及公开授权</span>
+                </label>
                 <label class="admin-field">
                   <span>学校 / 机构</span>
                   <input id="case-school" type="text" placeholder="例如：清华大学" />
@@ -88,18 +138,18 @@
                   <span>期刊 / 年份</span>
                   <input id="case-journal" type="text" placeholder="例如：Advanced Materials · 2026" />
                 </label>
-                <label class="admin-field admin-field-full">
+                <label class="admin-field admin-field-full" hidden>
                   <span>作品说明</span>
                   <input id="case-description" type="text" placeholder="例如：智能材料 / 期刊封面" />
                 </label>
-                <label class="admin-field admin-field-full">
+                <label class="admin-field admin-field-full" hidden>
                   <span>图片替代文字</span>
                   <input id="case-alt" type="text" placeholder="例如：首页科研绘图案例大图" />
                 </label>
                 <label class="admin-field admin-field-full">
                   <span>原图上传</span>
                   <input id="case-source" type="file" accept="image/*" />
-                  <small class="admin-field-hint">上传一张原图，系统会自动生成缩略图和大图。常规情况下只用这一项就够了。</small>
+                  <small class="admin-field-hint">保留完整原图，并生成 WebP 预览图。</small>
                 </label>
                 <label class="admin-field">
                   <span>缩略图上传</span>

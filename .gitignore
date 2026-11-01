@@ -1,6 +1,8 @@
 .env
 node_modules
 .env.local
+.wrangler/
+.dev.vars*
 backups/
 dist/
 gcm-login.err

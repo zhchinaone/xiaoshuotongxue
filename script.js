@@ -44,6 +44,8 @@ function getFilteredCases() {
 }
 
 async function loadSiteContent() {
+  const initial = document.getElementById('site-content');
+  if (initial) return JSON.parse(initial.textContent);
   try {
     const response = await fetch("/api/content", {
       headers: {
@@ -90,21 +92,22 @@ function renderGallery() {
         : `${filteredCases.length} 个筛选结果`;
   }
 
+  const escape = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   gallery.innerHTML = visibleCases
-    .map((entry) => {
-      const school = entry.school || "未命名机构";
-      const journal = entry.journal || "未填写期刊";
-      const description = entry.description || "等待补充作品说明";
-      const categories = entry.categories || "";
+    .map((entry, index) => {
+      const school = escape(entry.school);
+      const journal = escape(entry.journal);
+      const categories = escape(entry.categories);
       const title = `${school} · ${journal}`;
-      const thumbSource = entry.thumbSrc || entry.largeSrc || placeholderImage;
-      const largeSource = entry.largeSrc || entry.thumbSrc || placeholderImage;
+      const thumbSource = escape(entry.thumbSrc || entry.largeSrc || placeholderImage);
+      const largeSource = escape(entry.largeSrc || entry.thumbSrc || placeholderImage);
       return `
         <article class="case-card" data-category="${categories}">
           <button class="case-preview" type="button" data-large="${largeSource}" data-title="${title}">
             <img
               src="${thumbSource}"
-              alt="${entry.alt || `${title} 科研绘图案例`}"
+              alt="${title} 科研绘图作品"
+              loading="${index < 3 ? 'eager' : 'lazy'}"
               decoding="async"
               data-large-src="${largeSource}"
             />
@@ -112,7 +115,7 @@ function renderGallery() {
           <div class="case-meta">
             <span>${school}</span>
             <strong>${journal}</strong>
-            <em>${description}</em>
+            ${entry.detailReviewed && entry.caseKey && entry.school && entry.journal && (entry.largeSrc || entry.thumbSrc) ? `<a href="/cases/${encodeURIComponent(entry.caseKey)}/">查看案例</a>` : ''}
           </div>
         </article>
       `;
@@ -142,7 +145,8 @@ function bindGalleryEvents() {
   });
 
   document.querySelectorAll(".case-preview").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
       lastFocusedElement = document.activeElement;
       lightboxImage.src = button.dataset.large;
       lightboxImage.alt = button.querySelector("img").alt;

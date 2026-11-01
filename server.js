@@ -45,10 +45,73 @@ const EMPTY_CONTENT = {
 
 const DEFAULT_CONTENT = loadDefaultContent();
 let feishuService;
+const seoModules = Promise.all([
+  import('./seo/render.mjs'),
+  import('./functions/_shared/content.js'),
+  import('./functions/api/content.js'),
+  import('./functions/api/media.js'),
+]);
+const seoEnv = {
+  ...process.env,
+  ASSETS: { async fetch(request) {
+    const pathname = decodeURIComponent(new URL(request.url).pathname);
+    if (pathname === '/asset-manifest.json') {
+      const files = [];
+      function walk(dir) {
+        for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+          const file = path.join(dir, item.name);
+          if (item.isDirectory()) walk(file);
+          else files.push(path.relative(ROOT, file).replaceAll('\\', '/'));
+        }
+      }
+      walk(path.join(ROOT, 'assets'));
+      return new Response(JSON.stringify({ files }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    const file = path.resolve(ROOT, '.' + pathname);
+    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return new Response('Not found', { status: 404 });
+    return new Response(fs.readFileSync(file), { headers: { 'Content-Type': MIME_TYPES[path.extname(file)] || 'application/octet-stream' } });
+  } },
+};
+async function sendWebResponse(response, result) {
+  response.writeHead(result.status, Object.fromEntries(result.headers));
+  response.end(Buffer.from(await result.arrayBuffer()));
+}
 
 const server = http.createServer(async (request, response) => {
   try {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+    const [renderer, contentModule, contentApi, mediaApi] = await seoModules;
+    if (requestUrl.pathname === '/api/content' || requestUrl.pathname === '/api/media') {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const webRequest = new Request(requestUrl, {
+        method: request.method, headers: request.headers,
+        ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
+      });
+      const context = { env: seoEnv, request: webRequest };
+      const result = requestUrl.pathname === '/api/media'
+        ? await mediaApi.onRequestGet(context)
+        : request.method === 'POST' ? await contentApi.onRequestPost(context) : await contentApi.onRequestGet(context);
+      await sendWebResponse(response, result);
+      return;
+    }
+    if (!requestUrl.pathname.startsWith('/api/') && !/\.(css|js|jpg|jpeg|png|webp|svg|json|ico)$/.test(requestUrl.pathname) && !/\/(admin|ocr-tool)\.html$/.test(requestUrl.pathname)) {
+      try {
+        const content = await contentModule.loadPublicContent(seoEnv, new Request(requestUrl));
+        const rendered = renderer.renderRoute({ url: requestUrl, content, homeHtml: fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8') });
+        if (rendered) {
+          response.writeHead(rendered.status, { ...rendered.headers, 'Cache-Control': 'no-store' });
+          response.end(rendered.body);
+          return;
+        }
+      } catch (error) {
+        console.error('SEO content unavailable:', error.message);
+        response.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '60' });
+        response.end('内容暂时无法加载，请稍后重试。');
+        return;
+      }
+    }
+    if (/\/(admin|ocr-tool)\.html$/.test(requestUrl.pathname)) response.setHeader('X-Robots-Tag', 'noindex, nofollow');
 
     if (requestUrl.pathname.startsWith("/api/")) {
       await handleApiRequest(request, response, requestUrl);
